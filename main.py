@@ -4,8 +4,12 @@ import threading
 import json
 import websocket
 import json
+import eventlet
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
+socketio = SocketIO(app, async_mode='eventlet')
+# socketio = SocketIO(app, ping_interval=25, ping_timeout=10)
 
 # Global variable to hold the latest parsed data
 latest_data = [{
@@ -19,30 +23,9 @@ def on_open(ws):
     print("WebSocket connection established.")
     subscription_message = json.dumps({
         "command": "subscribe",
-        "channels": ["your_channel_id"]  # Replace with your actual channel
+        "channels": ["4"]  # Replace with your actual channel
     })
     ws.send(subscription_message)
-
-# def on_message(ws, message):
-#     global latest_data
-#     try:
-#         data = json.loads(message)
-#         if 'data' in data:
-#             ascii_data = hex_to_ascii(data['data'])
-#             print("Decoded ASCII data:", ascii_data)
-
-#             parts = [part.strip() for part in ascii_data.split(',')]
-#             if len(parts) == 3:
-#                 latest_data = {
-#                     "latitude": parts[0],
-#                     "longitude": parts[1],
-#                     "timestamp": parts[2]
-#                 }
-#                 print(f"Updated latest data: {latest_data}")
-#             else:
-#                 print("Unexpected ASCII format.")
-#     except Exception as e:
-#         print(f"Error processing message: {e}")
 
 DATA_FILE = "latest_data.json"
 
@@ -123,12 +106,6 @@ load_data()  # Load initial data from the file
 @app.route('/')
 def index():
     return jsonify({"Hello": "Welcome to the smart bike light app 🚅"})
-
-# @app.route('/lastdata')
-# def get_last_data():
-#     if latest_data["latitude"] is None:
-#         return jsonify({"message": "No data received yet"}), 503
-#     return jsonify(latest_data)
 
 @app.route('/lastdata')
 def get_last_data():
@@ -235,4 +212,5 @@ if __name__ == '__main__':
 
     # Start Flask app
     port = int(os.getenv("PORT", 8000))  # Use Render's assigned port or default to 5000
-    app.run(debug=True, host="0.0.0.0", port=port)
+    # app.run(debug=True, host="0.0.0.0", port=port)
+    socketio.run(app, host='0.0.0.0', port=port)
