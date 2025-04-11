@@ -1,6 +1,7 @@
 # main.py (修复版)
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
+from app.tasks import start_websocket_task
 from redis import Redis
 import json
 import os
@@ -17,6 +18,11 @@ redis_client = Redis.from_url(
     socket_connect_timeout=5,
     retry_on_timeout=True
 )
+
+@app.post("/trigger-task")
+def trigger_task():
+    start_websocket_task.delay()  # Trigger Celery task
+    return {"status": "Task triggered"}
 
 @app.on_event("startup")
 async def startup_event():
