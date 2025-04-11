@@ -3,23 +3,24 @@ services:
     name: fastapi-app
     runtime: docker
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+    buildCommand: docker build -t fastapi-app .
     envVars:
       - key: REDIS_URL
         fromService:
+          type: redis
           name: redis
           property: connectionString
+    healthCheckPath: /healthcheck
 
   - type: worker
     name: celery-worker
     runtime: docker
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.tasks worker --loglevel=info
+    buildCommand: docker build -t celery-worker .
     envVars:
       - key: REDIS_URL
         fromService:
+          type: redis
           name: redis
           property: connectionString
 
