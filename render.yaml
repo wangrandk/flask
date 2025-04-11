@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: fastapi-app
+    runtime: docker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: REDIS_URL
+        fromDatabase:
+          name: redis
+          property: connectionString
+
+  - type: worker
+    name: celery-worker
+    runtime: docker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.tasks worker --loglevel=info
+    envVars:
+      - key: REDIS_URL
+        fromDatabase:
+          name: redis
+          property: connectionString
+
+databases:
+  - name: redis
+    databaseName: redis
+    type: redis
+    plan: free
