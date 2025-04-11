@@ -7,6 +7,15 @@ import os
 import asyncio
 import websockets  # Using async websockets library only
 from dotenv import load_dotenv
+from celery.schedules import crontab
+
+app.conf.beat_schedule = {
+    'refresh-websocket': {
+        'task': 'app.tasks.start_websocket_task',
+        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+    },
+}
+
 load_dotenv()
 
 app = Celery('tasks', broker=os.getenv('REDIS_URL', 'redis://redis:6379/0'))
