@@ -1,7 +1,7 @@
 # main.py (修复版)
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-from app.tasks import start_websocket_task
+from tasks import start_websocket_task
 from redis import Redis
 import json
 import os
