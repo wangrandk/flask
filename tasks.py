@@ -7,10 +7,26 @@ import os
 import asyncio
 import websockets  # Using async websockets library only
 from dotenv import load_dotenv
+from main import get_payload_hash
+from typing import Dict
 load_dotenv()
 
 app = Celery('tasks', broker=os.getenv('REDIS_URL', 'redis://redis:6379/0'))
 redis_client = Redis.from_url(os.getenv('REDIS_URL', 'redis://redis:6379/0'))
+
+def process_and_store_data(data: Dict):
+    """Helper function with deduplication"""
+    payload_hash = get_payload_hash(data)
+    
+    # Only store if not seen before
+    if not redis_client.sismember("payload_hashes", payload_hash):
+        with redis_client.pipeline() as pipe:
+            pipe.multi()
+            pipe.set("latest_entry", json.dumps(data))
+            pipe.lpush("history", json.dumps(data))
+            pipe.sadd("payload_hashes", payload_hash)
+            pipe.execute()
+
 
 # app = Celery(
 #     "tasks",
@@ -74,11 +90,9 @@ async def websocket_listener():
             data = await websocket.recv()
             entry = process_message(data)  # Your existing message processor
             if entry:
-                with redis_client.pipeline() as pipe:
-                    pipe.set("latest_entry", json.dumps(entry))
-                    pipe.lpush("history", json.dumps(entry))
-                    pipe.ltrim("history", 0, 1000)
-                    pipe.execute()
+                 stored = process_and_store_data(entry)
+                 if stored:
+                    print(f"Stored new payload: {entry['timestamp']}")
 
 @app.task(bind=True, max_retries=3)
 def start_websocket_task(self):
