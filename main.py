@@ -1,32 +1,27 @@
+# main.py (修复版)
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from redis import Redis
 import json
 import os
-import hashlib
-from typing import List, Dict
+import websocket
+from tasks import start_websocket_task
 from dotenv import load_dotenv
-from typing import Dict
 load_dotenv()
 
 app = FastAPI()
+# In main.py, update Redis connection:
 redis_client = Redis.from_url(
-    os.getenv("REDIS_URL", "redis://redis:6379/0"),
+    os.getenv("REDIS_URL", "redis://redis:6379/0"),  # Note 'redis' hostname
     decode_responses=True,
     socket_connect_timeout=5,
     retry_on_timeout=True
 )
 
-def get_payload_hash(payload: Dict) -> str:
-    """Generate unique hash for payload to detect duplicates"""
-    payload_str = f"{payload['latitude']}_{payload['longitude']}_{payload['timestamp']}"
-    return hashlib.md5(payload_str.encode()).hexdigest()
-
 @app.on_event("startup")
 async def startup_event():
-    """Initialize with empty deduplication set if not exists"""
-    if not redis_client.exists("payload_hashes"):
-        redis_client.sadd("payload_hashes", "init")  # Create set
+    # 初始化默认数据
+    if not redis_client.exists("latest_entry") and not redis_client.exists("history"):
         default_data = {
             "latitude": 55.752488,
             "longitude": 12.524214,
@@ -34,40 +29,28 @@ async def startup_event():
         }
         redis_client.set("latest_entry", json.dumps(default_data))
         redis_client.lpush("history", json.dumps(default_data))
-        redis_client.sadd("payload_hashes", get_payload_hash(default_data))
+    
+    # 启动WebSocket任务
+    start_websocket_task.delay()
+
+@app.get("/")
+async def index():
+    return {"status": "running", "service": "Smart Bike Tracker"}
 
 @app.get("/lastdata")
-async def get_last_data() -> List[Dict]:
-    """Get all data with duplicates removed"""
+async def get_last_data():
+    # return {"message": "Test data"}
     try:
-        # Get latest entry
         latest_entry = redis_client.get("latest_entry")
-        latest = json.loads(latest_entry) if latest_entry else None
+        history = redis_client.lrange("history", 0, 1000) or []
         
-        # Get history (reverse to show newest first)
-        history = [
-            json.loads(h) 
-            for h in redis_client.lrange("history", 0, -1) or []
-        ][::-1]  # Reverse to show newest first
+        # Combine latest entry with history
+        all_data = []
+        if latest_entry:
+            all_data.append(json.loads(latest_entry))
+        all_data.extend([json.loads(h) for h in history])
         
-        # Deduplicate
-        seen_hashes = set()
-        deduped_data = []
-        
-        if latest:
-            latest_hash = get_payload_hash(latest)
-            if not redis_client.sismember("payload_hashes", latest_hash):
-                deduped_data.append(latest)
-                seen_hashes.add(latest_hash)
-        
-        for item in history:
-            item_hash = get_payload_hash(item)
-            if item_hash not in seen_hashes:
-                deduped_data.append(item)
-                seen_hashes.add(item_hash)
-        
-        return JSONResponse(deduped_data)
-    
+        return JSONResponse(all_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
