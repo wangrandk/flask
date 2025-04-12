@@ -34,3 +34,12 @@ celery -A tasks inspect ping
 .\redis-cli -h localhost -p 6379 ping  
 .\redis-cli GET latest_data       
 .\redis-cli.exe ping  
+
+
+docker-compose exec redis ls -la /data
+
+docker volume ls  # Should show your volume if using Option 1
+docker-compose exec redis redis-cli ping  # Should return PONG
+
+KEYS *
+GET latest_data
