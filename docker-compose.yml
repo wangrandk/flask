@@ -2,20 +2,18 @@ services:
   redis:
     image: redis:7-alpine
     command: redis-server --save 60 1 --appendonly yes  --appendfsync everysec # Persistence config
-    volumes:
-      - redis_data:/data  # Persistent volume
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 1s
-      timeout: 3s
-      retries: 30
+    # volumes:
+    #   - azure-file:/data # Persistent volume
+    # ports:
+    #   - "6379:6379"
+    # healthcheck:
+    #   test: ["CMD", "redis-cli", "ping"]
+    #   interval: 1s
+    #   timeout: 3s
+    #   retries: 30
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: philipwang/flask-app:latest
     ports:
       - "8000:8000"
     environment:
@@ -24,13 +22,9 @@ services:
       - redis
 
   celery:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: philipwang/flask-celery:latest
     command: celery -A tasks worker --pool=solo --loglevel=info
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
-volumes:
-  redis_data:  # Named volume declaration
