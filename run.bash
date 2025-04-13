@@ -43,3 +43,14 @@ docker-compose exec redis redis-cli ping  # Should return PONG
 
 KEYS *
 GET latest_data
+
+
+
+# docker push
+docker tag redis:7-alpine philipwang/redis:7-alpine
+docker tag flask-app:latest philipwang/flask-app:latest
+docker tag flask-celery:latest philipwang/flask-celery:latest
+
+docker push philipwang/redis:7-alpine 
+docker push philipwang/flask-celery:latest
+docker push philipwang/flask-app:latest 
