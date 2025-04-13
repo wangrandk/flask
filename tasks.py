@@ -10,8 +10,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Celery('tasks', broker=os.getenv('REDIS_URL', 'redis://redis:6379/0'))
-redis_client = Redis.from_url(os.getenv('REDIS_URL', 'redis://redis:6379/0'))
-
+# redis_client = Redis.from_url(os.getenv('REDIS_URL', 'redis://redis:6379/0'))
+redis_client = Redis.from_url(
+    os.getenv("REDIS_URL", "redis://redis:6379/0"),  # Note 'redis' hostname
+    decode_responses=True,
+    socket_connect_timeout=5,
+    retry_on_timeout=True,
+    health_check_interval=30  # Better for persistent connections
+)
 # app = Celery(
 #     "tasks",
 #     broker=REDIS_URL,

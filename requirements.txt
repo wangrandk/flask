@@ -6,3 +6,6 @@ redis
 websocket-client==1.6.1 
 websockets>=11.0
 python-dotenv
+folium>=0.14.0
+pandas>=1.3.0
+redis>=4.3.0
