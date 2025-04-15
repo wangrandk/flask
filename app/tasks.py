@@ -8,33 +8,27 @@ import asyncio
 import websockets  # Using async websockets library only
 from dotenv import load_dotenv
 load_dotenv()
+from celery import Celery
+import os
 
-app = Celery('tasks', broker=os.getenv('REDIS_URL', 'redis://redis:6379/0'))
-# redis_client = Redis.from_url(os.getenv('REDIS_URL', 'redis://redis:6379/0'))
-redis_client = Redis.from_url(
-    os.getenv("REDIS_URL", "redis://redis:6379/0"),  # Note 'redis' hostname
-    decode_responses=True,
-    socket_connect_timeout=5,
-    retry_on_timeout=True,
-    health_check_interval=30  # Better for persistent connections
+
+# Configure Celery with Azure Redis
+app = Celery(
+    'tasks',
+    broker=f"rediss://:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:6380/0?ssl_cert_reqs=none",
+    backend=f"rediss://:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:6380/1?ssl_cert_reqs=none"
 )
-# app = Celery(
-#     "tasks",
-#     broker=REDIS_URL,
-#     backend=REDIS_URL,
-#     broker_transport_options={
-#         'visibility_timeout': 3600,
-#         'socket_keepalive': True
-#     }
-# )
-# # Configure resilient Redis connection
-# redis_client = Redis.from_url(
-#     REDIS_URL,
-#     decode_responses=True,
-#     socket_keepalive=True,
-#     retry_on_timeout=True,
-#     retry=Retry(ExponentialBackoff(), 3)  # Retry 3 times with exponential backoff
-# )
+
+# Redis client configuration (same as in main.py)
+redis_client = Redis(
+    host=os.getenv("REDIS_HOST"),
+    port=6380,
+    password=os.getenv("REDIS_PASSWORD"),
+    ssl=True,
+    ssl_cert_reqs=None,
+    socket_timeout=10,
+    retry_on_timeout=True
+)
 
 def hex_to_ascii(hex_string):
     try:

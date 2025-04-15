@@ -2,24 +2,30 @@
 az login
 
 # Create resource group
-az group create --name FastAPIDeployment --location eastus
+az group create --name bidockerapp-dev --location westeurope 
 
-# Create Azure File Share for Redis persistence
-az storage account create --name fastapistorage123 --resource-group FastAPIDeployment --location eastus --sku Standard_LRS
-az storage share create --name redisdata --account-name fastapistorage123
+# 2. Create a Container App Environment
+az containerapp env create --name bidockerapp-dev-env --resource-group bidockerapp-dev --location westeurope
 
-# Get storage key
-STORAGE_KEY=$(az storage account keys list --account-name fastapistorage123 --resource-group FastAPIDeployment --query "[0].value" --output tsv)
+# 3. Deploy the Flask App
+# Load secrets from .env file
+source .env
 
-# Deploy with docker-compose
-az container create \
-  --resource-group FastAPIDeployment \
-  --name fastapi-celery-app \
-  --image yourusername/fastapi-celery-app:latest \
-  --dns-name-label fastapi-celery-app \
-  --ports 8000 \
-  --environment-variables REDIS_URL=redis://redis:6379/0 \
-  --azure-file-volume-account-name fastapistorage123 \
-  --azure-file-volume-account-key $STORAGE_KEY \
-  --azure-file-volume-share-name redisdata \
-  --azure-file-volume-mount-path /data
+az containerapp create --name bidockerapp-dev-app --resource-group bidockerapp-dev --environment bidockerapp-dev-env --image philipwang/flask-app:latest --target-port 5000 --ingress external --env-vars REDIS_HOST=$REDIS_HOST REDIS_PASSWORD=$REDIS_PASSWORD
+az containerapp update --name bidockerapp-dev-app --resource-group bidockerapp-dev --image philipwang/flask-app:latest 
+
+# 4. Deploy the Celery Worker
+az containerapp create --name bidockerapp-dev-celery --resource-group bidockerapp-dev --environment bidockerapp-dev-env --image philipwang/flask-celery:latest --command "celery -A tasks worker --loglevel=info" --env-vars REDIS_HOST=$REDIS_HOST REDIS_PASSWORD=$REDIS_PASSWORD REDIS_URL="rediss://:$REDIS_PASSWORD@$REDIS_HOST:6380/0?ssl_cert_reqs=none"
+
+# After deployment, retrieve the URL of your Flask app:
+az containerapp show --name bidockerapp-dev-app --resource-group bidockerapp-dev --query properties.configuration.ingress.fqdn
+
+az containerapp logs show --name bidockerapp-dev-app --resource-group bidockerapp-dev --output table
+
+# local run using Azure Redis Cache:
+docker run -p 5000:5000 -e REDIS_HOST=$REDIS_HOST -e REDIS_PASSWORD=$REDIS_PASSWORD philipwang/flask-app:latest
+
+az containerapp ingress show --name bidockerapp-dev-app --resource-group bidockerapp-dev --query "[targetPort, external]"
+
+docker build -t philipwang/flask-app:latest .  
+docker push philipwang/flask-app:latest
